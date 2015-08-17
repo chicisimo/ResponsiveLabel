@@ -56,10 +56,6 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
   [self initialTextConfiguration];
 }
 
-- (void)layoutSubviews {
-  [super layoutSubviews];
-  self.textContainer.size = self.bounds.size;
-}
 
 #pragma mark - Custom Getters
 
@@ -101,6 +97,25 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
 
 #pragma mark - Custom Setters
 
+- (void)layoutSubviews
+{
+  [super layoutSubviews];
+  self.textContainer.size = self.bounds.size;
+
+}
+
+//- (CGSize)intrinsicContentSize
+//{
+//  CGSize s = [super intrinsicContentSize];
+//  
+//  if (self.numberOfLines == 0) {
+//    // found out that sometimes intrinsicContentSize is 1pt too short!
+//    s.height += 1;
+//  }
+//  
+//  return s;
+//}
+
 - (void)setFrame:(CGRect)frame {
   [super setFrame:frame];
   [self updateTextContainerSize:frame.size];
@@ -139,13 +154,14 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
 
 - (void)setCustomTruncationEnabled:(BOOL)customTruncationEnabled {
   _customTruncationEnabled = customTruncationEnabled;
-  [self shouldAppendTruncationToken] ? [self appendTokenIfNeeded] : [self removeTokenIfPresent];
+  [self layoutIfNeeded];
+//  [self shouldAppendTruncationToken] ? [self appendTokenIfNeeded] : [self removeTokenIfPresent];
 }
 
 - (void)setTruncationToken:(NSString *)truncationToken {
   self.attributedTruncationToken = [[NSAttributedString alloc]initWithString:truncationToken
                                                                   attributes:[self attributesFromProperties]];
-  if ([self shouldAppendTruncationToken]) {
+  if ([self shouldAppendTruncationToken] && self.numberOfLines > 0) {
     [self appendTokenIfNeeded];
   }
 }
@@ -162,9 +178,46 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
   NSRange glyphRange = [_layoutManager glyphRangeForTextContainer:_textContainer];
   textOffset = [self textOffsetForGlyphRange:glyphRange];
   
+//  // Drawing code
+//  [_layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:textOffset];
+//  [_layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:textOffset];
+  NSLog(@"Text Drawn");
+//  [self appendTokenIfNeeded];
+  if ([self shouldAppendTruncationToken] && ![self truncationTokenAppended]) {
+    if ([self.textStorage isNewLinePresent]) {
+      //Append token string at the end of last visible line
+      [self.textStorage replaceCharactersInRange:[self rangeForTokenInsertionForStringWithNewLine]
+                            withAttributedString:self.attributedTruncationToken];
+    }
+    
+    //Check for truncation range and append truncation token if required
+    NSRange tokenRange =[self rangeForTokenInsertion];
+    NSLog(@"token range = %@",NSStringFromRange(tokenRange));
+    if (tokenRange.location != NSNotFound) {
+      [self.textStorage replaceCharactersInRange:tokenRange withAttributedString:self.attributedTruncationToken];
+//      [self redrawTextForRange:NSMakeRange(0, self.textStorage.length)];
+    }
+    
+    //Apply attributes if truncation token appended
+    NSRange truncationRange = [self rangeOfTruncationToken];
+    if (truncationRange.location != NSNotFound) {
+//      [self removeAttributeForTruncatedRange];
+      
+      //Apply attributes to the truncation token
+      NSString *key = [NSString stringWithFormat:kRegexFormatForSearchWord,self.attributedTruncationToken.string];
+      PatternDescriptor *descriptor = [self.patternDescriptorDictionary objectForKey:key];
+      if (descriptor) {
+        [self.textStorage addAttributes:descriptor.patternAttributes range:truncationRange];
+      }
+    }
+  }
+ glyphRange = [_layoutManager glyphRangeForTextContainer:_textContainer];
+  textOffset = [self textOffsetForGlyphRange:glyphRange];
+  
   // Drawing code
   [_layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:textOffset];
   [_layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:textOffset];
+
 }
 
 /**
@@ -202,13 +255,13 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
   [self setNeedsDisplayInRect:rect];
 }
 
-
 #pragma mark - Override UILabel Methods
 
 - (CGRect)textRectForBounds:(CGRect)bounds limitedToNumberOfLines:(NSInteger)numberOfLines {
   CGRect requiredRect = [self rectFittingTextForContainerSize:bounds.size
                                               forNumberOfLine:numberOfLines];
   self.textContainer.size = requiredRect.size;
+  NSLog(@"calculated container size = %f x %f",requiredRect.size.width,requiredRect.size.height);
   return requiredRect;
 }
 
@@ -228,6 +281,10 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
   }else if (numberOfLines > 0 && (numberOfLines > totalLines)) {
     textBounds.size.height += (numberOfLines - totalLines) * self.font.lineHeight;
   }
+  NSLog(@"initial size = %f x %f",size.width,size.height);
+  NSLog(@"number of lines = %ld",numberOfLines);
+  NSLog(@"text bounds = %f x %f",textBounds.size.width,textBounds.size.height);
+  NSLog(@"total lines = %ld",totalLines);
   textBounds.size.width = ceilf(textBounds.size.width);
   textBounds.size.height = ceilf(textBounds.size.height);
   return textBounds;
@@ -257,7 +314,7 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
     
     //Check for truncation range and append truncation token if required
      NSRange tokenRange =[self rangeForTokenInsertion];
-    
+    NSLog(@"token range = %@",NSStringFromRange(tokenRange));
     if (tokenRange.location != NSNotFound) {
       [self.textStorage replaceCharactersInRange:tokenRange withAttributedString:self.attributedTruncationToken];
       [self redrawTextForRange:NSMakeRange(0, self.textStorage.length)];
@@ -301,13 +358,12 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
 
 - (NSRange)rangeForTokenInsertion {
   self.textContainer.size = self.bounds.size;
-  if (self.text.length == 0) {
+  if (self.textStorage.length == 0) {
     return NSMakeRange(NSNotFound, 0);
   }
-  
   NSInteger glyphIndex = [self.layoutManager glyphIndexForCharacterAtIndex:self.textStorage.length - 1];
   NSRange range = [self.layoutManager truncatedGlyphRangeInLineFragmentForGlyphAtIndex:glyphIndex];
-  
+  NSLog(@"text container on truncation = %f x %f",self.textContainer.size.width,self.textContainer.size.height);
   if (range.location != NSNotFound && self.customTruncationEnabled) {
     range.length += self.attributedTruncationToken.length;
     range.location -= self.attributedTruncationToken.length;
@@ -342,7 +398,7 @@ static NSString *kRegexFormatForSearchWord = @"(%@)";
 }
 
 - (BOOL)shouldAppendTruncationToken {
-  return (self.textStorage.length > 0 && self.customTruncationEnabled && self.attributedTruncationToken.length > 0);
+  return (self.textStorage.length > 0 && self.customTruncationEnabled && self.attributedTruncationToken.length > 0 && self.numberOfLines > 0);
 }
 
 - (BOOL)truncationTokenAppended {

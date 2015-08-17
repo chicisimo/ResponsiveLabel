@@ -37,24 +37,26 @@
 
 - (UITableViewCell*)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
   CustomTableViewCell *cell = [self.tableView dequeueReusableCellWithIdentifier:@"customCell" forIndexPath:indexPath];
-  [cell.customLabel layoutIfNeeded];
+//  [cell.customLabel layoutIfNeeded];
+
   NSString *str = @"A long text with #hashTag text, with @username and URL http://www.google.com ";
   for (NSInteger i = 0 ; i < indexPath.row ; i++) {
-    str = [NSString stringWithFormat:@"%@ %@",str,@"A long text\n"];
+    str = [NSString stringWithFormat:@"%@ %@",str,@"A long text A long text A long text A long text"];
   }
   str = [NSString stringWithFormat:@"%@",str];
   [cell configureText:str forExpandedState:[self.expandedIndexPaths containsObject:indexPath]];
-  
+//  cell.customLabel.text = str;
   cell.delegate = self;
   return cell;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-  if ([self.expandedIndexPaths containsObject:indexPath]) {
-    return UITableViewAutomaticDimension;
-  }else {
-    return 100.0;
-  }
+//  if ([self.expandedIndexPaths containsObject:indexPath]) {
+//    return UITableViewAutomaticDimension;
+//  }else {
+//    return 150.0;
+//  }
+   return UITableViewAutomaticDimension;
 }
 
 
