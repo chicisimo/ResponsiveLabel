@@ -11,7 +11,7 @@
 #import "InlineTextAttachment.h"
 
 static NSString *kRegexStringForHashTag = @"(?<!\\w)#([\\w\\_]+)?";
-static NSString *kRegexStringForUserHandle = @"(?<!\\w)@([\\w\\_]+)?";
+static NSString *kRegexStringForUserHandle = @"@([A-z0-9_.-])+";
 static NSString *kRegexFormatForSearchWord = @"(%@)";
 
 NSString *RLTapResponderAttributeName = @"TapResponder";
